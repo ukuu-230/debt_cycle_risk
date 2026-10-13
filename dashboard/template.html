@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Debt-Cycle Risk Monitor</title>
+<style>
+  /* Research terminal: dense, methodology-forward, monospaced data. Cool slate
+     ground, restrained ink-blue accent, semantic status kept orthogonal to the
+     categorical country hues. Layout = summary band, then diagnostic panels. */
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --panel-2: #fafbfc;
+    --ink: #1a2028;
+    --ink-2: #55606d;
+    --ink-3: #8a94a1;
+    --line: #e2e6ea;
+    --line-2: #eef1f4;
+    --accent: #1f6f9c;
+    --accent-soft: #e6f0f6;
+    --good: #2f8f57; --good-soft: #e4f1e9;
+    --watch: #b5701a; --watch-soft: #f6ecdb;
+    --alarm: #b83d34; --alarm-soft: #f6e0dd;
+    /* categorical (validated): US, Japan, UK, Euro */
+    --c-us: #1f6f9c; --c-jp: #b5701a; --c-uk: #8a4fa0; --c-eu: #3f8f52;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+    --serif: "Newsreader", Georgia, serif;
+    --shadow: 0 1px 2px rgba(26,32,40,.06), 0 4px 14px rgba(26,32,40,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161c; --panel: #1a1f27; --panel-2: #1e242d; --ink: #e8ecf1;
+      --ink-2: #9aa5b2; --ink-3: #6b7683; --line: #2a323c; --line-2: #222932;
+      --accent: #4aa3d0; --accent-soft: #17242c;
+      --good: #56b47c; --good-soft: #16281e; --watch: #d69a3c; --watch-soft: #2a2313;
+      --alarm: #d76a5f; --alarm-soft: #2c1a17;
+      --c-us: #4aa3d0; --c-jp: #d69a3c; --c-uk: #b985cc; --c-eu: #5cb46e;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161c; --panel: #1a1f27; --panel-2: #1e242d; --ink: #e8ecf1;
+    --ink-2: #9aa5b2; --ink-3: #6b7683; --line: #2a323c; --line-2: #222932;
+    --accent: #4aa3d0; --accent-soft: #17242c;
+    --good: #56b47c; --good-soft: #16281e; --watch: #d69a3c; --watch-soft: #2a2313;
+    --alarm: #d76a5f; --alarm-soft: #2c1a17;
+    --c-us: #4aa3d0; --c-jp: #d69a3c; --c-uk: #b985cc; --c-eu: #5cb46e;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 60px; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  h1,h2,h3 { margin: 0; line-height: 1.2; text-wrap: balance; }
+  h1 { font-family: var(--serif); font-size: clamp(1.7rem,4vw,2.3rem); font-weight: 600; letter-spacing: -.01em; }
+  .eyebrow { font-family: var(--mono); font-size: .7rem; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 24px; }
+  header .sub { color: var(--ink-2); margin-top: 8px; max-width: 74ch; font-size: .95rem; }
+  header .meta { font-family: var(--mono); font-size: .74rem; color: var(--ink-3); margin-top: 12px; display: flex; gap: 18px; flex-wrap: wrap; }
+  header .meta span { white-space: nowrap; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  .panel-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 16px 0; flex-wrap: wrap; }
+  .panel-h h2 { font-size: .82rem; font-family: var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+  .panel-h .hint { font-size: .74rem; color: var(--ink-3); }
+  .panel-b { padding: 14px 16px 16px; }
+
+  .grid { display: grid; gap: 16px; }
+  .g2 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: repeat(3,1fr); }
+  @media (max-width: 800px){ .g2,.g3 { grid-template-columns: 1fr; } }
+
+  /* summary band */
+  .summary { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 800px){ .summary { grid-template-columns: 1fr; } }
+  .tile { padding: 16px; }
+  .tile .k { font-family: var(--mono); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+  .tile .v { font-family: var(--serif); font-size: 2.6rem; font-weight: 600; line-height: 1; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .tile .v small { font-size: 1rem; color: var(--ink-3); font-weight: 400; font-family: var(--sans); }
+  .tile .cap { font-size: .84rem; color: var(--ink-2); margin-top: 8px; }
+  .pill { display: inline-block; font-family: var(--mono); font-size: .72rem; padding: 3px 9px; border-radius: 4px; font-weight: 600; letter-spacing: .03em; }
+  .p-good { color: var(--good); background: var(--good-soft); }
+  .p-watch { color: var(--watch); background: var(--watch-soft); }
+  .p-alarm { color: var(--alarm); background: var(--alarm-soft); }
+
+  /* flag decomposition table */
+  table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line-2); }
+  th { font-family: var(--mono); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: none; }
+  .barcell { position: relative; min-width: 90px; }
+  .barcell .bg { position: absolute; inset: 6px 10px; background: var(--line-2); border-radius: 3px; }
+  .barcell .fg { position: absolute; left: 10px; top: 6px; bottom: 6px; border-radius: 3px; }
+  .wt { color: var(--ink-3); font-size: .78rem; }
+
+  /* recession backtest */
+  .auc-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 14px; }
+  .auc { text-align: center; padding: 12px 8px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; }
+  .auc .h { font-family: var(--mono); font-size: .68rem; color: var(--ink-3); letter-spacing: .05em; }
+  .auc .n { font-family: var(--serif); font-size: 1.9rem; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .auc .n.hi { color: var(--good); }
+  .chartbox { overflow-x: auto; }
+  svg { display: block; max-width: 100%; height: auto; font-family: var(--mono); }
+
+  .lede-eco { font-size: .9rem; color: var(--ink-2); margin: 0 0 12px; max-width: 76ch; }
+  .lede-eco b { color: var(--ink); font-weight: 600; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-family: var(--mono); font-size: .76rem; margin-top: 10px; }
+  .legend .it { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
+  .legend .sw { width: 14px; height: 3px; border-radius: 2px; }
+
+  .notes { font-size: .84rem; color: var(--ink-2); }
+  .notes li { margin-bottom: 7px; }
+  .notes b { color: var(--ink); }
+  .notes code { font-family: var(--mono); font-size: .82em; background: var(--panel-2); padding: 1px 5px; border-radius: 3px; border: 1px solid var(--line-2); }
+
+  .foot { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 14px; font-family: var(--mono); font-size: .72rem; color: var(--ink-3); }
+  .foot p { margin: 0 0 5px; }
+  .toggle { position: fixed; top: env(safe-area-inset-top,0px); right: 12px; margin-top: 12px; z-index: 20;
+    background: var(--panel); color: var(--ink-2); border: 1px solid var(--line); border-radius: 6px;
+    padding: 6px 11px; font-size: .74rem; font-family: var(--mono); cursor: pointer; box-shadow: var(--shadow); }
+  .toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tt { position: fixed; pointer-events: none; z-index: 30; background: var(--ink); color: var(--bg);
+    font-family: var(--mono); font-size: .74rem; padding: 6px 9px; border-radius: 6px; opacity: 0; transition: opacity .12s; max-width: 260px; }
+
+  /* 4-up summary band */
+  .summary { grid-template-columns: 1.3fr 1fr 1fr 1fr; }
+  @media (max-width: 960px){ .summary { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px){ .summary { grid-template-columns: 1fr; } }
+  .tile .v.sm { font-size: 2.1rem; }
+
+  .mb { margin-bottom: 16px; }
+  .note-inline { font-size: .8rem; color: var(--ink-3); margin-top: 10px; }
+  .note-inline b { color: var(--ink-2); font-weight: 600; }
+
+  /* fiscal panel */
+  .ctx-banner { display: flex; gap: 10px; align-items: flex-start; background: var(--watch-soft); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; font-size: .84rem; color: var(--ink-2); margin-bottom: 14px; }
+  .ctx-banner b { color: var(--ink); }
+  .ctx-banner .tag { font-family: var(--mono); font-size: .68rem; font-weight: 600; letter-spacing: .08em; color: var(--watch);
+    white-space: nowrap; padding-top: 2px; }
+  .fname { font-weight: 600; }
+  .fwhy { font-size: .76rem; color: var(--ink-3); margin-top: 2px; }
+  .pbar { position: relative; height: 8px; background: var(--line-2); border-radius: 4px; min-width: 110px; }
+  .pbar .f { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--ink-3); }
+  .pbar .f.hi { background: var(--watch); }
+  .pbar .f.ex { background: var(--alarm); }
+  .plab { font-family: var(--mono); font-size: .74rem; margin-top: 4px; color: var(--ink-2); }
+  .plab .x { color: var(--alarm); font-weight: 600; }
+  .plab .h { color: var(--watch); font-weight: 600; }
+  svg.spark { width: 120px; height: 30px; }
+
+  .empty { max-width: 640px; margin: 80px auto; text-align: center; color: var(--ink-2); }
+  .empty code { font-family: var(--mono); background: var(--panel); border: 1px solid var(--line); padding: 2px 6px; border-radius: 4px; }
+  .chg-r { color: var(--alarm); }
+  .chg-g { color: var(--good); }
+  .chg-n { color: var(--ink-2); }
+  td.chg, td.num { white-space: nowrap; }
+  .pulse-sum { font-size: .86rem; color: var(--ink-2); margin: 0 0 10px; }
+  .pulse-sum b { color: var(--ink); }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+</head>
+<body>
+<button class="toggle" id="themeBtn" aria-label="Toggle light/dark theme">◐ theme</button>
+<div class="tt" id="tt"></div>
+
+<div class="wrap" id="app">
+  <header>
+    <div class="eyebrow">Dalio Long-Term Debt-Cycle Framework · US + G4</div>
+    <h1>Debt-Cycle Risk Monitor</h1>
+    <p class="sub">A composite early-warning read on US structural credit-cycle risk, decomposed into research-weighted flags, with a recession-lead backtest, a fiscal &amp; valuation context panel, and a cross-country credit-to-GDP gap monitor. Every figure is recomputed from FRED on each update; no parameter is fit to the recession labels.</p>
+    <div class="meta">
+      <span id="mUpdated">UPDATED: —</span>
+      <span id="mRef">REF QUARTER: —</span>
+      <span id="mMkt">MARKETS AS OF: —</span>
+      <span>SOURCE: FRED · BIS · OECD</span>
+    </div>
+  </header>
+
+  <!-- SUMMARY BAND -->
+  <div class="summary grid mb">
+    <div class="panel tile">
+      <div class="k">Composite structural risk</div>
+      <div class="v" id="tRisk">—</div>
+      <div style="margin-top:8px"><span class="pill" id="tRegime">—</span></div>
+      <div class="cap" id="tRiskCap"></div>
+    </div>
+    <div class="panel tile">
+      <div class="k">Recession lead (8Q)</div>
+      <div class="v sm mono" id="tAuc">—</div>
+      <div class="cap" id="tAucCap"></div>
+    </div>
+    <div class="panel tile">
+      <div class="k">Short-horizon stress</div>
+      <div class="v sm mono" id="tShort">—</div>
+      <div class="cap" id="tShortCap"></div>
+    </div>
+    <div class="panel tile">
+      <div class="k">Credit-to-GDP gap, US</div>
+      <div class="v sm mono" id="tGap">—</div>
+      <div style="margin-top:8px"><span class="pill" id="tGapPill">—</span></div>
+      <div class="cap" id="tGapCap"></div>
+    </div>
+  </div>
+
+  <!-- DAILY MARKET PULSE -->
+  <div class="panel mb">
+    <div class="panel-h"><h2>Daily market pulse</h2><span class="hint" id="pulseHint">FRED closes · refreshed each business day · not blended into the composite</span></div>
+    <div class="panel-b">
+      <p class="pulse-sum" id="pulseSum"></p>
+      <div style="overflow-x:auto">
+      <table id="pulseTable">
+        <thead><tr><th>Series</th><th class="num">Close</th><th class="num">1D</th><th class="num">1W</th><th class="num">1M</th><th>Percentile (10y)</th><th>90 days</th><th class="num">As of</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+      <p class="note-inline"><span class="chg-r">▲▼ red</span> = move toward more risk, <span class="chg-g">green</span> = away from risk (direction fixed from theory: higher yields, wider credit spreads, higher VIX, a stronger dollar, a flatter/inverted curve and a deeper equity drawdown count as risk; breakevens are two-sided). Rates in basis points. Series post on different lags, so check each date. These are fast-moving context; the structural score above changes quarterly by design.</p>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="panel mb">
+    <div class="panel-h"><h2>Composite risk history</h2><span class="hint">research-weighted, 0–100 · shaded = NBER recession</span></div>
+    <div class="panel-b chartbox">
+      <svg id="histChart" viewBox="0 0 1000 240" role="img" aria-label="Composite risk score over the full sample with NBER recessions shaded"></svg>
+      <p class="note-inline" id="provNote"></p>
+    </div>
+  </div>
+
+  <!-- FLAG DECOMPOSITION -->
+  <div class="panel mb">
+    <div class="panel-h">
+      <h2 id="flagTitle">Composite decomposition</h2>
+      <span class="hint">flag value ∈ [0,100], regime-conditional research weights (renormalized over present flags)</span>
+    </div>
+    <div class="panel-b">
+      <p class="lede-eco">Flags are normalized to a common risk scale (Fed/OFR stress-index construction), oriented so higher = more risk, and combined under <b>fixed, regime-conditional weights drawn from external literature</b> (BIS early-warning work; Adrian-Estrella-Shin term spread; Fed conditions indices), never estimated on the sample's ~8 recessions. The regime (calm/building/elevated) is set by the credit-gap level against Basel thresholds.</p>
+      <div style="overflow-x:auto">
+      <table id="flagTable">
+        <thead><tr><th>Flag</th><th class="num">Value</th><th>Contribution (weight × value)</th><th class="num">Wt</th><th>State</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+      <p class="note-inline" id="flagNote"></p>
+    </div>
+  </div>
+
+  <!-- RECESSION BACKTEST -->
+  <div class="grid g2 mb">
+    <div class="panel">
+      <div class="panel-h"><h2>Recession-lead backtest</h2><span class="hint">USREC onsets · not model labels</span></div>
+      <div class="panel-b">
+        <div class="auc-row" id="aucRow"></div>
+        <p class="notes" style="margin:0" id="aucNote"></p>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Lead profile: risk before onset</h2><span class="hint">mean composite, quarters −8 → 0</span></div>
+      <div class="panel-b chartbox">
+        <svg id="leadChart" viewBox="0 0 460 220" role="img" aria-label="Composite risk in the quarters before recession onsets, credit/policy-driven vs exogenous"></svg>
+        <div class="legend" id="leadLegend"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BACKTEST ROBUSTNESS -->
+  <div class="panel mb">
+    <div class="panel-h"><h2>Backtest robustness</h2><span class="hint">descriptive only · never used to re-weight</span></div>
+    <div class="panel-b">
+      <p class="lede-eco">Does the AUC survive when the flag set is held constant, and outside the 1970s rate regime? Which flags carry it? <b>Δ</b> is composite AUC minus AUC with that flag removed (same quarters): positive = the flag helps. With ~8 recessions, |Δ| below ~0.03 is noise, and re-weighting from this table would be fitting to the sample.</p>
+      <p class="pulse-sum" id="robCallout"></p>
+      <div class="grid g2">
+        <div style="overflow-x:auto"><table id="robTable"><thead><tr><th>Sample</th><th class="num">1Q</th><th class="num">4Q</th><th class="num">8Q</th></tr></thead><tbody></tbody></table></div>
+        <div style="overflow-x:auto"><table id="attTable"><thead><tr><th>Flag</th><th class="num">Alone</th><th class="num">Without</th><th class="num">Δ</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FISCAL & VALUATION CONTEXT -->
+  <div class="panel mb">
+    <div class="panel-h"><h2>Fiscal &amp; valuation context</h2><span class="hint">percentile vs own history · expanding window, no look-ahead</span></div>
+    <div class="panel-b">
+      <div class="ctx-banner"><span class="tag">NOT SCORED</span>
+        <div>The composite cannot see this leg: the BIS credit gap covers the <b>private</b> sector only, and the recession backtest cannot validate sovereign metrics. In the metric-gap audit, federal debt/GDP and the deficit scored AUC ≈ 0.3 because deficits widen <i>after</i> recessions. They are shown here as context, with <b>no panel composite</b>, since any weight would be a guess.</div>
+      </div>
+      <div style="overflow-x:auto">
+      <table id="fiscalTable">
+        <thead><tr><th>Metric</th><th class="num">Latest</th><th>Percentile vs history</th><th>Last 10 years</th><th class="num">As of</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+      <p class="note-inline">Percentiles here are against the <b>full</b> history on purpose: the question is "is this a record?". Several of these series trend, so a high percentile means <i>historically unusual</i>, not a calibrated danger level (which is why none of them is scored). Metric set chosen from theory (Dalio, <i>How Countries Go Broke</i>), not by which series read extreme today. Valuation ratios are index-based, so only the percentile is shown.</p>
+    </div>
+  </div>
+
+  <!-- CROSS-COUNTRY GAP -->
+  <div class="panel mb">
+    <div class="panel-h"><h2>Cross-country credit-to-GDP gap</h2><span class="hint" id="gapHint">BIS ratios · one-sided HP λ=400k</span></div>
+    <div class="panel-b">
+      <p class="lede-eco">The gap is the one non-redundant cross-country signal: term spreads and HY OAS co-move globally (already in the US composite), whereas credit cycles are national. Read the <b>relative ordering</b> more than the absolute levels: a one-sided HP trend anchored on the pre-2008 peak biases post-crisis gaps negative across the board.</p>
+      <div class="chartbox"><svg id="gapChart" viewBox="0 0 700 250" role="img" aria-label="Credit-to-GDP gap trajectory by economy"></svg></div>
+      <div class="legend" id="gapLegend"></div>
+      <div style="overflow-x:auto; margin-top:14px">
+      <table id="gapTable">
+        <thead><tr><th>Economy</th><th class="num">Gap (pp)</th><th>Basel state</th><th class="num">Usable q</th><th>Confidence</th><th class="num">2Y Δ</th><th class="num">As of</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- METHOD & CAVEATS -->
+  <div class="grid g2">
+    <div class="panel">
+      <div class="panel-h"><h2>Method notes</h2></div>
+      <div class="panel-b"><ul class="notes" style="padding-left:18px; margin:0">
+        <li><b>No look-ahead.</b> Percentiles rank each value against prior observations only (mid-rank ties); the HP trend is one-sided (<code>λ=400,000</code>, 40q burn-in). Quarterly macro inputs are re-timed to their <b>publication</b> quarter (<span id="lagTxt">credit gap +2q, DSR +2q, M2 velocity +1q</span>), and backtest quarters whose outcome window is not yet observed are excluded.</li>
+        <li><b>Stationary inputs.</b> Trending series are transformed before ranking: M2 velocity enters as its year-on-year change; the long-bond yield is ranked within a trailing 10-year window. Curve: <span id="curveTxt">10y−3m</span>.</li>
+        <li><b>Specification v2 (Oct 2026).</b> The credit-spread <i>level</i> was moved out of the structural composite into the short-term stress gauge: spreads are coincident (wide in and after recessions, tight before them), as the design notes stated. This was decided <b>after</b> the live backtest showed it (standalone AUC 0.40), so the v1 numbers are kept in the robustness table: v1 is the clean validated figure, v2 the better-designed gauge. Remaining weights are v1's renormalized; none was re-chosen.</li>
+        <li><b>No fitting to the target.</b> Weights are external-research priors, not estimates, so the AUC is not an in-sample fit. A supervised stage classifier failed to beat its base rate and was demoted.</li>
+        <li><b>Metric-gap audit.</b> 20 further candidates (fiscal, valuation, external, credit-supply, housing) are tested for lead AUC, redundancy and incremental ΔAUC under pre-registered rules, each re-timed to its publication date (<code>run_metric_audit.py</code>). The fiscal/valuation leg the backtest cannot validate is shown as context above.</li>
+        <li><b>Renormalization.</b> Missing flags drop and weights renormalize; the headline uses the latest quarter with ≥ <span id="minFlags">4</span> flags.</li>
+      </ul></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Known limitations</h2></div>
+      <div class="panel-b"><ul class="notes" style="padding-left:18px; margin:0">
+        <li><b>Latest-vintage data.</b> Current-vintage FRED, not ALFRED point-in-time: publication <i>timing</i> is corrected, but later data <i>revisions</i> still leak into the backtest.</li>
+        <li><b>HP-filter critique.</b> The one-sided HP gap is the Basel/BIS standard, but Hamilton (2018) shows it can generate spurious cycle dynamics; read gap magnitudes with that in mind.</li>
+        <li><b>Small sample.</b> <span id="nRec">~8</span> non-independent recessions. AUCs are descriptive, not inferential.</li>
+        <li><b>No non-US validation.</b> NBER is US-only; the cross-country gaps carry no recession backtest. Short-history gaps are marked by confidence tier.</li>
+        <li><b>Exogenous blindness by design.</b> It models credit cycles, not shocks (2001 and 2020 stay quiet). Not financial advice.</li>
+      </ul></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>FRAMEWORK: Dalio, <i>Principles for Navigating Big Debt Crises</i>; <i>How Countries Go Broke</i>. DATA: FRED (Federal Reserve Bank of St. Louis), Bank for International Settlements, OECD. NBER chronology via USREC.</p>
+    <p>Composite ≠ forecast. A rising multi-quarter trajectory is the object of interest; point levels are noisy.</p>
+  </div>
+</div>
+
+<script>
+const DATA = /*__DASHBOARD_DATA__*/null;
+
+(function(){
+  if (!DATA) {
+    document.getElementById("app").innerHTML =
+      '<div class="empty"><h1>No data yet</h1><p>This is the dashboard template. Run <code>python export_dashboard.py</code> to build <code>site/index.html</code> with live FRED data.</p></div>';
+    return;
+  }
+  const $ = id => document.getElementById(id);
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const fmt = (v, d=1) => v==null ? "—" : (v>0?"+":"") + v.toFixed(d);
+  const fmtNeg = (v, d=1) => v==null ? "—" : (v<0 ? "−"+Math.abs(v).toFixed(d) : (v>0?"+":"")+v.toFixed(d));
+  const stPill = { good:"p-good", watch:"p-watch", alarm:"p-alarm" };
+  const stCol  = { good:"--good", watch:"--watch", alarm:"--alarm" };
+  const tt = $("tt");
+  function showTT(e, html){ tt.innerHTML=html; tt.style.opacity=1;
+    tt.style.left=Math.min(e.clientX+14, innerWidth-tt.offsetWidth-8)+"px";
+    tt.style.top=Math.max(8, e.clientY-tt.offsetHeight-10)+"px"; }
+  function hideTT(){ tt.style.opacity=0; }
+  // line path that breaks at nulls
+  function linePath(arr, xs, ys){ let d="", pen=false;
+    arr.forEach((v,i)=>{ if(v==null){ pen=false; return; } d+=(pen?"L":"M")+xs(i).toFixed(1)+" "+ys(v).toFixed(1)+" "; pen=true; });
+    return d; }
+  const lastIdx = arr => { for(let i=arr.length-1;i>=0;i--) if(arr[i]!=null) return i; return -1; };
+
+  const H = DATA.headline;
+
+  // ---------- header / tiles ----------
+  $("mUpdated").textContent = "UPDATED: " + DATA.generated;
+  $("mRef").textContent = "REF QUARTER: " + H.q + " (" + H.n_flags + " of 7 flags)";
+  $("minFlags").textContent = H.min_flags;
+  if (DATA.method) {
+    $("curveTxt").textContent = DATA.method.curve;
+    const L2 = Object.entries(DATA.method.lags||{}).map(([k,v])=>k.replace(/_/g," ")+" +"+v+"q");
+    if (L2.length) $("lagTxt").textContent = L2.join(", ");
+  }
+  $("nRec").textContent = DATA.n_recessions;
+
+  $("tRisk").innerHTML = H.risk + '<small> / 100</small>';
+  const rp = { calm:"p-good", building:"p-watch", elevated:"p-alarm" }[H.regime] || "p-watch";
+  $("tRegime").className = "pill " + rp; $("tRegime").textContent = "regime: " + H.regime;
+  const basis = H.gap==null ? "credit gap unavailable this quarter, so the neutral default is used"
+                            : "set by credit gap " + fmtNeg(H.gap) + "pp vs Basel 2 / 10";
+  $("tRiskCap").innerHTML = "Equal-weight cross-check <b class='mono'>" + H.equal + "</b> (divergence " + H.divergence +
+    (H.divergence>15 ? ", <b>weighting is doing real work</b>" : ", within tolerance") + "). Regime " + basis + ".";
+
+  const a8 = DATA.auc.find(a=>a.h===8), a4 = DATA.auc.find(a=>a.h===4), a1 = DATA.auc.find(a=>a.h===1);
+  $("tAuc").innerHTML = (a8 && a8.auc!=null ? a8.auc.toFixed(2) : "—") + '<small> AUC</small>';
+  if (a8 && a8.auc!=null) $("tAuc").style.color = a8.auc>=0.7 ? "var(--good)" : (a8.auc>=0.6 ? "var(--watch)" : "var(--ink)");
+  $("tAucCap").textContent = "Mann-Whitney AUC of risk preceding NBER onsets: " +
+    [a1,a4,a8].filter(Boolean).map(a=>a.h+"Q "+(a.auc==null?"—":a.auc.toFixed(2))).join(" → ") + ".";
+
+  if (DATA.short) {
+    $("tShort").innerHTML = DATA.short.stress + '<small> / 100</small>';
+    let c = "Separate fast gauge (VIX, dollar, credit-spread level and widening, curve change), never blended into the composite. Peak-in-quarter " + DATA.short.worst + ". ";
+    if (DATA.short.nfci!=null) { const dv=Math.abs(DATA.short.stress-DATA.short.nfci);
+      c += "Fed NFCI on the same scale: " + Math.round(DATA.short.nfci) + (dv<=10 ? " (agrees)." : " (diverges by "+Math.round(dv)+").");}
+    $("tShortCap").textContent = c + " " + DATA.short.q + ".";
+  } else { $("tShortCap").textContent = "Unavailable this run."; }
+
+  const us = DATA.gaps && DATA.gaps.meta.find(m=>m.key==="US");
+  if (us) {
+    $("tGap").innerHTML = fmtNeg(us.gap) + '<small> pp</small>';
+    const gp = us.state==="max-warning" ? "p-alarm" : (us.state==="watch" ? "p-watch" : "p-good");
+    $("tGapPill").className = "pill " + gp; $("tGapPill").textContent = us.state.replace("-"," ");
+    $("tGapCap").textContent = "One-sided HP (λ=400k), " + us.q + ". Private non-financial credit only; government debt is in the context panel.";
+  }
+
+  // ---------- flag table ----------
+  $("flagTitle").textContent = "Composite decomposition: US " + H.q;
+  const maxC = Math.max(1, ...DATA.flags.map(f=>f.contrib));
+  const tb = document.querySelector("#flagTable tbody");
+  DATA.flags.forEach(f=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML = '<td>'+f.name+'</td><td class="num">'+f.v+'</td>'+
+      '<td class="barcell"><div class="bg"></div><div class="fg" style="width:'+(f.contrib/maxC*86).toFixed(1)+'%;background:var('+stCol[f.st]+')"></div></td>'+
+      '<td class="num wt">'+f.wt.toFixed(2)+'</td><td><span class="pill '+stPill[f.st]+'">'+f.st+'</span></td>';
+    tr.title = "contribution " + f.contrib + " pts";
+    tb.appendChild(tr);
+  });
+  $("flagNote").innerHTML = "State bands: good &lt; 33 ≤ watch &lt; 67 ≤ alarm. Contributions sum to the composite (" + H.risk + ")." +
+    (DATA.missing_flags.length ? " <b>Missing this quarter:</b> " + DATA.missing_flags.join(", ") + " (weights renormalized)." : "");
+  $("provNote").innerHTML = DATA.provisional.length
+    ? "<b>Provisional</b> (more recent, fewer flags due to reporting lag): " + DATA.provisional.map(p=>p.q+" → "+p.risk+" ("+p.n+" flags)").join(" · ")
+    : "Headline quarter is the latest scored quarter.";
+
+  // ---------- AUC row ----------
+  const aucRow = $("aucRow");
+  DATA.auc.forEach(a=>{ const d=document.createElement("div"); d.className="auc";
+    d.innerHTML='<div class="h">'+a.h+'Q</div><div class="n'+(a.h===8?' hi':'')+'">'+(a.auc==null?"—":a.auc.toFixed(2))+'</div>';
+    aucRow.appendChild(d); });
+  $("aucNote").textContent = "AUC of composite risk discriminating quarters that precede an NBER onset within the horizon (in-recession quarters excluded). " +
+    "Rising with horizon is the signature of a leading credit-cycle indicator rather than a coincident stress meter. " +
+    DATA.n_recessions + " onsets in sample (" + DATA.onsets.join(", ") + "): descriptive, not inferential.";
+
+  // ---------- robustness ----------
+  const f2 = v => v==null ? "—" : v.toFixed(2);
+  (DATA.robustness||[]).forEach(r=>{ const tr=document.createElement("tr");
+    if (r.v1) tr.style.color = "var(--ink-3)";
+    tr.innerHTML='<td>'+r.label+(r.v1?' <span class="wt">(before the change)</span>':'')+'</td>'+r.auc.map(a=>'<td class="num">'+f2(a)+'</td>').join("");
+    document.querySelector("#robTable tbody").appendChild(tr); });
+  (DATA.attribution||[]).slice().sort((a,b)=>(b.delta??-9)-(a.delta??-9)).forEach(a=>{ const tr=document.createElement("tr");
+    const d=a.delta, cls = d==null ? "chg-n" : (d>=0.03 ? "chg-g" : (d<=-0.03 ? "chg-r" : "chg-n"));
+    const lab = d==null ? "" : (d>=0.03 ? " helps" : (d<=-0.03 ? " dilutes" : " noise"));
+    tr.innerHTML='<td>'+a.name+'</td><td class="num">'+f2(a.standalone_auc)+'</td><td class="num">'+f2(a.drop_one_auc)+'</td>'+
+      '<td class="num '+cls+'">'+(d==null?"—":(d>0?"+":"")+d.toFixed(3))+'<span class="wt">'+lab+'</span></td>';
+    document.querySelector("#attTable tbody").appendChild(tr); });
+
+  // what carries the AUC, stated in words (computed, never hard-coded)
+  (function(){
+    const A=(DATA.attribution||[]).filter(a=>a.standalone_auc!=null);
+    if(!A.length) return;
+    const comp=A[0].composite_auc, best=A.slice().sort((a,b)=>b.standalone_auc-a.standalone_auc)[0];
+    const carrier=A.slice().sort((a,b)=>(b.delta??-9)-(a.delta??-9))[0];
+    const hurt=A.filter(a=>a.delta!=null && a.delta<=-0.03).map(a=>a.name);
+    let t;
+    if (comp < 0.6) {
+      t = "<b>The composite shows no meaningful recession-lead signal in this sample</b> (8Q AUC "+comp.toFixed(2)+").";
+    } else if (best.standalone_auc >= comp-0.01 && carrier.key===best.key && carrier.delta>=0.03) {
+      t = "<b>The composite's recession-lead skill comes mainly from one flag:</b> "+best.name+" scores "+best.standalone_auc.toFixed(2)+" on its own vs "+comp.toFixed(2)+" for the composite. The other flags measure debt-cycle position, which recession timing does not test well (only one of the sample's recessions, 2008, was a credit crisis).";
+    } else {
+      t = "The composite ("+comp.toFixed(2)+") beats its best single flag ("+best.name+", "+best.standalone_auc.toFixed(2)+"): combining adds information.";
+    }
+    if(hurt.length) t += " Lowers the recession AUC: "+hurt.join(", ")+". Weights are not changed for this: doing so would fit them to ~8 recessions.";
+    $("robCallout").innerHTML = t;
+  })();
+
+  // ---------- daily market pulse ----------
+  const P = DATA.pulse || [];
+  if (P.length) {
+    const latestDate = P.map(p=>p.as_of).sort().slice(-1)[0];
+    $("mMkt").textContent = "MARKETS AS OF: " + latestDate;
+    const scored = P.filter(p=>p.toward_risk_1m!==null);
+    const toward = scored.filter(p=>p.toward_risk_1m).length;
+    $("pulseSum").innerHTML = "<b>" + toward + " of " + scored.length + "</b> directional series moved toward more risk over the past month.";
+    const pt = document.querySelector("#pulseTable tbody");
+    const cell = (p, v) => {
+      if (v==null) return '<td class="num chg chg-n">—</td>';
+      const unit = p.chg_unit==="bp" ? "bp" : (p.chg_unit==="%" ? "%" : (p.chg_unit==="pp" ? "pp" : ""));
+      const d = p.chg_unit==="bp" ? 0 : 2;
+      let cls = "chg-n", arr = v>0 ? "▲" : (v<0 ? "▼" : "·");
+      if (p.risk_dir!==0 && v!==0) cls = (Math.sign(v)===p.risk_dir) ? "chg-r" : "chg-g";
+      return '<td class="num chg '+cls+'">'+arr+' '+(v>0?"+":"")+v.toFixed(d)+unit+'</td>';
+    };
+    P.forEach((p,pi)=>{
+      const tr=document.createElement("tr");
+      const close = p.sid==="SP500" ? p.latest.toFixed(1)+'% <span class="wt">('+(p.level_close!=null?p.level_close.toLocaleString():"—")+')</span>'
+                                    : p.latest.toFixed(2)+(p.unit?' <span class="wt">'+p.unit+'</span>':'');
+      tr.innerHTML = '<td>'+p.name+'</td><td class="num">'+close+'</td>'+cell(p,p.chg_1d)+cell(p,p.chg_1w)+cell(p,p.chg_1m)+
+        '<td><div class="pbar"><div class="f" style="width:'+p.pct_10y+'%"></div></div><div class="plab">'+p.pct_10y+'th pct'+(p.pct_years!=null && p.pct_years<9.5 ? ' <span class="wt">('+p.pct_years.toFixed(0)+'y only)</span>' : '')+'</div></td>'+
+        '<td><svg class="spark" id="pspark'+pi+'" viewBox="0 0 120 30" role="img" aria-label="'+p.name+', last 90 business days"></svg></td>'+
+        '<td class="num wt">'+p.as_of+'</td>';
+      pt.appendChild(tr);
+    });
+  } else {
+    document.querySelector("#pulseTable tbody").innerHTML = '<tr><td colspan="8" class="wt">Daily market series unavailable this run.</td></tr>';
+  }
+
+  // ---------- fiscal table ----------
+  const ft = document.querySelector("#fiscalTable tbody");
+  DATA.fiscal.forEach((m,mi)=>{
+    const p = m.percentile, cls = p>=90 ? "ex" : (p>=75 ? "hi" : "");
+    const lab = p>=90 ? '<span class="x">extreme</span>' : (p>=75 ? '<span class="h">high</span>' : 'normal range');
+    const tr=document.createElement("tr");
+    tr.innerHTML = '<td><div class="fname">'+m.name+'</div><div class="fwhy">'+m.why+'</div></td>'+
+      '<td class="num">'+(m.unit ? m.latest.toFixed(1)+' <span class="wt">'+m.unit+'</span>' : '<span class="wt">index</span>')+'</td>'+
+      '<td><div class="pbar"><div class="f '+cls+'" style="width:'+p+'%"></div></div><div class="plab">'+p+'th pct · '+lab+'</div></td>'+
+      '<td><svg class="spark" id="spark'+mi+'" viewBox="0 0 120 30" role="img" aria-label="'+m.name+' last 10 years"></svg></td>'+
+      '<td class="num wt">'+m.as_of+'</td>';
+    ft.appendChild(tr);
+  });
+  if (!DATA.fiscal.length) ft.innerHTML = '<tr><td colspan="5" class="wt">Fiscal series unavailable this run.</td></tr>';
+
+  // ---------- gap table + legend ----------
+  if (DATA.gaps) {
+    $("gapHint").textContent = "BIS ratios · one-sided HP λ=400k · through " + DATA.gaps.q[DATA.gaps.q.length-1];
+    const gl=$("gapLegend"), gt=document.querySelector("#gapTable tbody");
+    DATA.gaps.meta.forEach(mt=>{
+      const d=document.createElement("div"); d.className="it";
+      d.innerHTML='<span class="sw" style="background:var('+mt.col+')"></span>'+mt.c; gl.appendChild(d);
+      const st = mt.state==="max-warning" ? "alarm" : (mt.state==="watch" ? "watch" : "good");
+      const tr=document.createElement("tr");
+      tr.innerHTML='<td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var('+mt.col+');margin-right:7px;vertical-align:middle"></span>'+mt.c+'</td>'+
+        '<td class="num">'+fmtNeg(mt.gap)+'</td><td><span class="pill '+stPill[st]+'">'+mt.state.replace("-"," ")+'</span></td>'+
+        '<td class="num">'+mt.nq+'</td><td class="mono" style="font-size:.8rem;color:var(--ink-2)">'+mt.conf+'</td>'+
+        '<td class="num">'+fmtNeg(mt.d2y)+'</td><td class="num wt">'+mt.q+'</td>';
+      gt.appendChild(tr);
+    });
+  }
+
+  // lead legend
+  const L = DATA.lead;
+  $("leadLegend").innerHTML =
+    '<div class="it"><span class="sw" style="background:var(--alarm)"></span>credit/policy-driven ('+L.credit_onsets.map(o=>o.slice(0,4)).join(", ")+')</div>'+
+    '<div class="it"><span class="sw" style="background:var(--ink-3)"></span>exogenous ('+L.exog_onsets.map(o=>o.slice(0,4)).join(", ")+')</div>';
+
+  // ================= charts (re-run on theme change) =================
+  function drawHist(){
+    const svg=$("histChart"), W=1000, Ht=240, m={t:12,r:14,b:28,l:34};
+    const h=DATA.history, n=h.length, iw=W-m.l-m.r, ih=Ht-m.t-m.b;
+    const xs=i=>m.l+(n<2?0:i/(n-1)*iw), ys=v=>m.t+(1-v/100)*ih;
+    let s="";
+    // recession bands
+    let i=0; while(i<n){ if(h[i].rec){ let j=i; while(j+1<n && h[j+1].rec) j++;
+      s+='<rect x="'+(xs(i)-iw/n/2).toFixed(1)+'" y="'+m.t+'" width="'+Math.max(2,(xs(j)-xs(i)+iw/n)).toFixed(1)+'" height="'+ih+'" fill="'+css('--line')+'" opacity=".9"/>'; i=j+1; } else i++; }
+    for(let g=0; g<=100; g+=25){ s+='<line x1="'+m.l+'" y1="'+ys(g)+'" x2="'+(W-m.r)+'" y2="'+ys(g)+'" stroke="'+css('--line-2')+'"/>';
+      s+='<text x="'+(m.l-6)+'" y="'+(ys(g)+3)+'" font-size="10" fill="'+css('--ink-3')+'" text-anchor="end">'+g+'</text>'; }
+    let lastYr=null; h.forEach((p,k)=>{ const yr=+p.q.slice(0,4); if(yr%10===0 && p.q.endsWith("Q1") && yr!==lastYr){ lastYr=yr;
+      s+='<text x="'+xs(k)+'" y="'+(Ht-8)+'" font-size="10" fill="'+css('--ink-3')+'" text-anchor="middle">'+yr+'</text>'; }});
+    s+='<path d="'+linePath(h.map(p=>p.r),xs,ys)+'" fill="none" stroke="'+css('--accent')+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    const li=n-1; s+='<circle cx="'+xs(li)+'" cy="'+ys(h[li].r)+'" r="4" fill="'+css('--accent')+'" stroke="'+css('--panel')+'" stroke-width="2"/>';
+    s+='<line id="hx" x1="0" y1="'+m.t+'" x2="0" y2="'+(m.t+ih)+'" stroke="'+css('--ink-3')+'" stroke-dasharray="3 3" opacity="0"/>';
+    svg.innerHTML=s;
+    svg.onmousemove=e=>{ const r=svg.getBoundingClientRect(), sx=(e.clientX-r.left)/r.width*W;
+      let k=Math.round((sx-m.l)/iw*(n-1)); k=Math.max(0,Math.min(n-1,k));
+      const hx=svg.querySelector("#hx"); hx.setAttribute("x1",xs(k)); hx.setAttribute("x2",xs(k)); hx.setAttribute("opacity",1);
+      showTT(e,'<b>'+h[k].q+'</b><br>risk '+h[k].r.toFixed(0)+(h[k].rec?'<br>NBER recession':'')); };
+    svg.onmouseleave=()=>{ hideTT(); const hx=svg.querySelector("#hx"); if(hx) hx.setAttribute("opacity",0); };
+  }
+
+  function drawLead(){
+    const svg=$("leadChart"), W=460, Ht=220, m={t:16,r:14,b:34,l:34};
+    const iw=W-m.l-m.r, ih=Ht-m.t-m.b, xs=i=>m.l+i/8*iw;
+    const all=[...L.credit,...L.exog].filter(v=>v!=null);
+    const lo=Math.max(0,Math.floor((Math.min(...all)-5)/10)*10), hi=Math.min(100,Math.ceil((Math.max(...all)+5)/10)*10);
+    const ys=v=>m.t+(1-(v-lo)/(hi-lo))*ih;
+    let s="";
+    for(let g=lo; g<=hi; g+=10){ s+='<line x1="'+m.l+'" y1="'+ys(g)+'" x2="'+(W-m.r)+'" y2="'+ys(g)+'" stroke="'+css('--line')+'"/>';
+      s+='<text x="'+(m.l-6)+'" y="'+(ys(g)+3)+'" font-size="9" fill="'+css('--ink-3')+'" text-anchor="end">'+g+'</text>'; }
+    for(let i=0;i<=8;i+=2) s+='<text x="'+xs(i)+'" y="'+(Ht-16)+'" font-size="9" fill="'+css('--ink-3')+'" text-anchor="middle">'+(i-8)+'Q</text>';
+    s+='<text x="'+(m.l+iw/2)+'" y="'+(Ht-3)+'" font-size="8.5" fill="'+css('--ink-3')+'" text-anchor="middle">quarters before onset (0 = onset)</text>';
+    [[L.exog,'--ink-3'],[L.credit,'--alarm']].forEach(([arr,c])=>{ if(!arr.length) return;
+      s+='<path d="'+linePath(arr,xs,ys)+'" fill="none" stroke="'+css(c)+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+      const k=lastIdx(arr); if(k>=0) s+='<circle cx="'+xs(k)+'" cy="'+ys(arr[k])+'" r="3.5" fill="'+css(c)+'"/>'; });
+    svg.innerHTML=s;
+    svg.onmousemove=e=>{ const r=svg.getBoundingClientRect(), sx=(e.clientX-r.left)/r.width*W;
+      let i=Math.round((sx-m.l)/iw*8); i=Math.max(0,Math.min(8,i));
+      const f=v=>v==null?"—":v.toFixed(0);
+      showTT(e,'<b>'+(i-8)+'Q</b><br>credit/policy: '+f(L.credit[i])+'<br>exogenous: '+f(L.exog[i])); };
+    svg.onmouseleave=hideTT;
+  }
+
+  function drawGap(){
+    if(!DATA.gaps) return;
+    const G=DATA.gaps, svg=$("gapChart"), W=700, Ht=250, m={t:16,r:60,b:34,l:40};
+    const n=G.q.length, iw=W-m.l-m.r, ih=Ht-m.t-m.b, xs=i=>m.l+(n<2?0:i/(n-1)*iw);
+    const vals=Object.values(G.series).flat().filter(v=>v!=null).concat([0,2]);
+    const lo=Math.floor((Math.min(...vals)-2)/5)*5, hi=Math.ceil((Math.max(...vals)+2)/5)*5;
+    const ys=v=>m.t+(1-(v-lo)/(hi-lo))*ih;
+    let s="";
+    const step = (hi-lo)>30 ? 10 : 5;
+    for(let g=Math.ceil(lo/step)*step; g<=hi; g+=step){ s+='<line x1="'+m.l+'" y1="'+ys(g)+'" x2="'+(W-m.r)+'" y2="'+ys(g)+'" stroke="'+css('--line')+'"/>';
+      s+='<text x="'+(m.l-6)+'" y="'+(ys(g)+3)+'" font-size="9" fill="'+css('--ink-3')+'" text-anchor="end">'+g+'</text>'; }
+    s+='<line x1="'+m.l+'" y1="'+ys(0)+'" x2="'+(W-m.r)+'" y2="'+ys(0)+'" stroke="'+css('--ink-3')+'" stroke-width="1.2" stroke-dasharray="2 2"/>';
+    [[2,'Basel +2'],[10,'Basel +10']].forEach(([t,lab])=>{ if(t>lo && t<hi){
+      s+='<line x1="'+m.l+'" y1="'+ys(t)+'" x2="'+(W-m.r)+'" y2="'+ys(t)+'" stroke="'+css(t===10?'--alarm':'--watch')+'" stroke-dasharray="4 3" opacity=".7"/>';
+      s+='<text x="'+(m.l+4)+'" y="'+(ys(t)-4)+'" font-size="8" fill="'+css(t===10?'--alarm':'--watch')+'">'+lab+'</text>'; }});
+    G.q.forEach((q,i)=>{ if(i%2===(n-1)%2) s+='<text x="'+xs(i)+'" y="'+(Ht-14)+'" font-size="8.5" fill="'+css('--ink-3')+'" text-anchor="middle">'+q.slice(2)+'</text>'; });
+    // end labels, nudged apart so they never collide
+    const ends=[];
+    G.meta.forEach(mt=>{ const arr=G.series[mt.key]; if(!arr) return; const col=css(mt.col);
+      s+='<path d="'+linePath(arr,xs,ys)+'" fill="none" stroke="'+col+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+      const k=lastIdx(arr); if(k<0) return;
+      s+='<circle cx="'+xs(k)+'" cy="'+ys(arr[k])+'" r="3.5" fill="'+col+'" stroke="'+css('--panel')+'" stroke-width="2"/>';
+      ends.push({y:ys(arr[k]), x:xs(k), key:mt.key}); });
+    ends.sort((a,b)=>a.y-b.y); for(let i=1;i<ends.length;i++) if(ends[i].y-ends[i-1].y<11) ends[i].y=ends[i-1].y+11;
+    ends.forEach(e=> s+='<text x="'+(W-m.r+8)+'" y="'+(e.y+3)+'" font-size="9.5" fill="'+css('--ink-2')+'">'+e.key+'</text>');
+    svg.innerHTML=s;
+    svg.onmousemove=e=>{ const r=svg.getBoundingClientRect(), sx=(e.clientX-r.left)/r.width*W;
+      let i=Math.round((sx-m.l)/iw*(n-1)); i=Math.max(0,Math.min(n-1,i));
+      let h='<b>'+G.q[i]+'</b><br>'; G.meta.forEach(mt=>{ const v=(G.series[mt.key]||[])[i]; h+=mt.key+': '+(v==null?'—':v.toFixed(1)+'pp')+'<br>'; });
+      showTT(e,h); };
+    svg.onmouseleave=hideTT;
+  }
+
+  function drawSparks(){
+    DATA.fiscal.forEach((m,mi)=>{ const svg=$("spark"+mi); if(!svg) return;
+      const a=m.history, n=a.length; if(n<2) return;
+      const lo=Math.min(...a), hi=Math.max(...a), rng=(hi-lo)||1;
+      const xs=i=>2+i/(n-1)*112, ys=v=>26-(v-lo)/rng*22;
+      const col = m.percentile>=90 ? css('--alarm') : (m.percentile>=75 ? css('--watch') : css('--ink-3'));
+      svg.innerHTML='<path d="'+linePath(a,xs,ys)+'" fill="none" stroke="'+col+'" stroke-width="1.6" stroke-linejoin="round"/>'+
+        '<circle cx="'+xs(n-1)+'" cy="'+ys(a[n-1])+'" r="2.6" fill="'+col+'"/>';
+      svg.onmousemove=e=>showTT(e,'<b>'+m.name+'</b><br>'+m.history_q[0]+' → '+m.history_q[n-1]+'<br>range '+lo.toFixed(1)+' to '+hi.toFixed(1));
+      svg.onmouseleave=hideTT;
+    });
+  }
+
+  function drawPulseSparks(){
+    P.forEach((p,pi)=>{ const svg=$("pspark"+pi); if(!svg) return;
+      const a=p.spark, n=a.length; if(n<2) return;
+      const lo=Math.min(...a), hi=Math.max(...a), rng=(hi-lo)||1;
+      const xs=i=>2+i/(n-1)*112, ys=v=>26-(v-lo)/rng*22;
+      const col = p.toward_risk_1m===true ? css('--alarm') : (p.toward_risk_1m===false ? css('--good') : css('--ink-3'));
+      svg.innerHTML='<path d="'+linePath(a,xs,ys)+'" fill="none" stroke="'+col+'" stroke-width="1.6" stroke-linejoin="round"/>'+
+        '<circle cx="'+xs(n-1)+'" cy="'+ys(a[n-1])+'" r="2.6" fill="'+col+'"/>';
+      svg.onmousemove=e=>showTT(e,'<b>'+p.name+'</b><br>90-day range '+lo.toFixed(2)+' to '+hi.toFixed(2)+'<br>latest '+a[n-1].toFixed(2));
+      svg.onmouseleave=hideTT; });
+  }
+
+  function drawAll(){ drawHist(); drawLead(); drawGap(); drawSparks(); drawPulseSparks(); }
+  drawAll();
+
+  $("themeBtn").addEventListener("click",()=>{
+    const root=document.documentElement, cur=root.getAttribute("data-theme");
+    const dark = cur ? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.setAttribute("data-theme", dark?"light":"dark");
+    drawAll();   // SVGs bake tokens at draw time; repaint against the new theme
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ if(!document.documentElement.getAttribute("data-theme")) drawAll(); });
+
+  // ---------- self-refresh: an open tab picks up each new publish ----------
+  if (location.protocol.startsWith("http")) {
+    const check = () => fetch("data.json?t="+Date.now(), {cache:"no-store"})
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && d.generated && d.generated !== DATA.generated) location.reload(); })
+      .catch(() => {});
+    setInterval(check, 15*60*1000);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState==="visible") check(); });
+  }
+})();
+</script>
+</body>
+</html>

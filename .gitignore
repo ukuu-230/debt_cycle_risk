@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+site/
+.venv/
+.idea/
+*.csv
+# never commit a key: it lives only in the FRED_API_KEY env var / GitHub secret
+.env

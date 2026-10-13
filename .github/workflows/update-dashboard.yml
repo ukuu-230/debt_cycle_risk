@@ -1,0 +1,63 @@
+name: Update debt-cycle dashboard
+
+on:
+  schedule:
+    # Every business day, twice (times in UTC; New York shown for EDT):
+    #   13:17 UTC ~ 9:17am  -- picks up the overnight FRED posts (VIX, HY OAS, S&P 500, dollar)
+    #   22:17 UTC ~ 6:17pm  -- picks up same-afternoon posts (Treasury yields, curve, breakevens)
+    # FRED publishes these once per business day, so running more often would
+    # only redownload identical data. GitHub may start a scheduled run a few
+    # minutes late under load -- that's normal.
+    - cron: "17 13 * * 1-5"
+    - cron: "17 22 * * 1-5"
+  workflow_dispatch:        # "Run workflow" button for an immediate refresh
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run unit tests (fail fast before touching the live page)
+        run: |
+          for t in scorer.test_risk_flags scorer.test_recession_backtest scorer.test_credit_gap_monitor ingestion.test_fred_client ingestion.test_derived scorer.test_fiscal_panel scorer.test_market_pulse scorer.test_short_horizon labeling.test_labeling; do
+            python -m debt_cycle_scoring.$t
+          done
+
+      - name: Build dashboard from live FRED data
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python export_dashboard.py --out site
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
