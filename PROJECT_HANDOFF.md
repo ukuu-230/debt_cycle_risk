@@ -179,3 +179,43 @@ Still to check: the top of the output (headline, regime should now be "calm", In
 - v2 weights = v1 weights renormalized without the spread (`_renormalize_without`); nothing re-chosen. `SPEC_V1_FLAG_NAMES` / `SPEC_V1_WEIGHTS` kept; `composite_spec_v1()` rebuilds the v1 composite so run_scorer and the dashboard always print v1 vs v2 AUCs side by side.
 - Framing (must stay honest): v1 (live 8Q AUC 0.768) is the clean validated number; any v2 gain was found after seeing the data. Expected v2 8Q AUC ~0.83 (= v1 drop-one result) -- confirm on the next live run.
 - Dashboard callout logic fixed: only says one flag "carries" the result when it both scores >= composite alone and has the largest positive delta; says "no meaningful signal" when composite AUC < 0.6.
+- CONFIRMED live (2026-10-05): v2 AUC 0.835 / 0.844 / 0.831; >=4 flags 0.85/0.86/0.83; 1985+ 0.75/0.81/0.82. v1 0.80/0.81/0.77 (shown alongside). Curve still carries (delta +0.171); credit gap delta -0.053 (dilutes recession timing; kept on purpose -- it measures debt-cycle position; no second post-hoc change).
+
+## 18. Metric audit on spec v2 (live, 2026-10-13)
+No ADD. Every candidate's incremental 8Q dAUC <= +0.017 (noise); the 6-flag composite stays as is.
+Best standalone 8Q AUCs: core PCE 0.74 (REDUNDANT, rho 0.77 w/ long bond); building permits 0.67 (dAUC +0.015); current-account deficit 0.66 (only 90q); household debt Z.1 0.66 (REDUNDANT, rho 0.79 w/ credit gap -- confirms the gap captures household leverage); SLOOS 0.76 at 4Q / 0.62 at 8Q.
+Fiscal again scores BELOW 0.5 (debt/GDP 0.27, deficit 0.36: they rise after recessions) -> stays CONTEXT, never scored.
+Current readings (trending levels vs trailing 10y): federal debt/GDP 90th pct, deficit 87th, interest/receipts 80th, term premium 100th, corporate equities/GDP 100th, household net worth/income 98th.
+Offered (not built): add corporate equities/GDP to the unscored fiscal & valuation panel -- it was missing only because SP500 history on FRED is short, not by choice.
+
+## 19. Dalio context panel expanded (2026-10-13)
+`scorer/fiscal_panel.py` now builds 18 UNSCORED rows in four Dalio groups (Sovereign debt & financing / Bubble gauges / Private leverage & credit / Monetary policy capacity MP1->MP3). New: r-g, foreign share of federal debt, current-account balance, real dollar yoy, corporate equities/GDP (Z.1), household and corporate debt/GDP 3y change, SLOOS, fed funds (low = risk), real policy rate, core PCE, Fed balance sheet/GDP 1y change. Building permits deliberately excluded (tests well but not a Dalio indicator).
+- Each row has risk_dir (+1 / -1 / 0); bars are oriented so longer = riskier; two-sided rows are blue and labeled "unusual" at the tails.
+- `_per_gdp()` divides dollar LEVELS by GDP (median magnitude >= 1000) and leaves ratios alone; such rows show a percentile only.
+- Every row that shows a raw value has a plausibility range; outside it the value is hidden (guards against FRED unit surprises).
+- BUG FOUND: NCBDBIQ027S is a Z.1 dollar LEVEL, not debt/GDP (catalog label was wrong). The audit's "Corporate debt/GDP, 3yr change" row measured nominal debt growth; now fixed via `_per_gdp`. Its old WEAK verdict should be re-checked on the next audit run.
+- Workflow: actions/checkout@v5, actions/setup-python@v6, runs-on ubuntu-24.04 (pinned before GitHub's Oct 19 Ubuntu 26 switch).
+- User's local env: project now at D:\debt cycle risk project with its own .venv (base Python C:\Users\esext\AppData\Local\Python\bin\python.exe; the WindowsApps python.exe is the Store stub). Repo: github.com/ukuu-230/debt_cycle_risk, deployed via GitHub Pages.
+
+## 20. Plain-English layer (2026-10-13)
+- `dashboard/explain.js`: ~60 explanation entries (plain English / how to read / why it matters / technical), keyed to `data-x` hooks on every tile, panel heading, flag, pulse series, context metric and country row. Edit wording here without touching logic.
+- `dashboard/guide.js`: click-to-open ⓘ cards (bottom sheet on phones, Esc/outside-click closes, follows its button on scroll); a "Plain-English read" panel at the top rewritten from DATA on each update (band, 1-yr trend, scenario, why the score is where it is from flag contributions, extremes outside the score, what would change the picture); a "Scenario guide" panel with six Dalio scenarios: acute stress, deleveraging/policy response, late cycle (curve), credit bubble building, calm private / stretched public & valuations, healthy expansion. First match in that priority order = "where we are now".
+- Portfolio text = documented historical tendencies per scenario + Dalio's All-Weather default, labeled "general historical information, not personal financial advice"; disclaimer uses the live 8Q AUC and states the tool was never tested on returns. Deliberately no buy/sell or allocation numbers.
+- export_dashboard.py inlines both JS files (page stays single-file). Tested: each scenario forced via synthetic DATA selects correctly; 61 buttons all resolve; no JS errors; phone 390px no horizontal scroll.
+
+## 21. Dalio's "The Numbers Behind the Bond Bear Market" folded in (2026-10-13)
+Source: raydalio.substack.com/p/the-numbers-behind-the-bond-bear (same piece as the LinkedIn post, which blocks automated reading). Published Oct 13 2026.
+- Explanations updated with his concepts, his numbers only as dated + attributed context (field `s` = source line in the card): debt/GDP is a weak gauge, interest/revenue is his preferred one (~21% of revenue; avg rate on existing debt ~3.5% vs 4-5.5% market; +1pp avg rate ~ +$310B/yr); "death spiral"; bills ~50% of issuance vs ~20% typical; foreigners ~32% / Fed ~14% of holdings, demand for long Treasuries "clearly weakening"; Fed as swing buyer; AI-driven corporate bond and equity issuance ("canary in the coal mine"); global bond-supply competition.
+- New 7th scenario `bond_squeeze` ("Bond bear market: debt supply outrunning demand"), his mid-cycle stage: triggers when long-bond flag >= 75 AND (term premium or interest/receipts risk percentile >= 75) AND short-horizon stress < 65. Priority: after late_cycle, before credit_bubble. Portfolio text = historical bond-bear-market evidence (1965-81, 2022) + his attributed view ("probably has a long way to go"; "easier to be short than long US Treasuries", which he labels not investment advice).
+- Context panel: interest/receipts now first in the sovereign group (his preferred gauge).
+- Not built (needs data FRED doesn't carry): bills share of issuance, total debt service incl. principal rollovers (~200% of revenue per Dalio), Treasury holder breakdown by country.
+
+## 22. Free US Treasury sources added (2026-10-13)
+`ingestion/treasury_client.py` (no key; injectable transport, sha1 disk cache, retries, raises only TreasuryDataError; `fetch_treasury_extras` skips any failing source with a warning). Layouts verified live 2026-10-13:
+- Fiscal Data API `v2/accounting/od/avg_interest_rates` (fields record_date, security_type_desc, security_desc, avg_interest_rate_amt; row Marketable / "Total Marketable"; Sep 2026 = 3.518%) -> TSY_AVG_RATE_MKT.
+- Fiscal Data API `v1/debt/mspd/mspd_table_1` (security_type_desc, security_class_desc, total_mil_amt; "Bills" and "Total Marketable") -> TSY_BILLS_SHARE (Sep 2026 = 22.4%).
+- TIC Table 5 `ticdata.treasury.gov/.../slt_table5.txt` (tab-separated, latest 13 months only; old mfh.txt froze in Mar 2023) -> TIC_JP_CN (Japan + China, Mainland), TIC_OFFICIAL ("Of Which: Foreign Official").
+- FRED WSHOBL (Fed T-bill holdings, weekly, from 2002).
+New context rows: refi_gap (DGS10 - avg rate on existing debt), bills_share (vs TBAC 15-20%), tic_jp_cn and tic_official (mode "chg12m": 12-month % change, no percentile because only 13 months are published), fed_bills (4-quarter $bn change, two-sided). `check_sources.py` prints live status of each Treasury source.
+Still not available free/clean: bills share of NEW issuance (Dalio's ~50%; would need auction data), total debt service incl. principal rollovers (needs MSPD maturity detail), corporate bond issuance / hyperscaler concessions (SIFMA spreadsheets, not an API).
+- 2026-10-13: context-panel explanation now covers the 12-month-change rows; bond_squeeze 'where we are' text cites refi_gap (if > 0) and the Japan+China 12-month change (if falling) when available.

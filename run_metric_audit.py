@@ -158,6 +158,13 @@ def _hh_debt_long(raw, panel):
     return (to_quarterly(d, "last") / to_quarterly(gdp, "last") * 100.0).diff(12)
 
 
+def _corp_debt_ratio_chg(raw, panel):
+    """NCBDBIQ027S is a Z.1 dollar LEVEL, not a ratio: divide by GDP before the
+    3-yr change (fixed 2026-10-13; earlier audits measured nominal debt growth)."""
+    from debt_cycle_scoring.scorer.fiscal_panel import _per_gdp, _change
+    return _change(_per_gdp(raw, "NCBDBIQ027S"), 12)
+
+
 def _chg12(sid: str):
     def f(raw, panel):
         s = _get(raw, sid)
@@ -222,7 +229,7 @@ CANDIDATES: List[Candidate] = [
     Candidate("Household debt/GDP (Z.1, long), 3yr chg", "household leverage build, full history",
               False, _hh_debt_long, "new series (CMDEBT)"),
     Candidate("Corporate debt/GDP, 3yr change", "corporate leverage build",
-              False, _chg12("NCBDBIQ027S"), "fetched, unscored"),
+              False, _corp_debt_ratio_chg, "fetched, unscored"),
     Candidate("Bank lending standards (SLOOS C&I)", "credit supply tightening",
               False, _level("DRTSCILM", "last"), "new series (from 1990)"),
     # --- monetary stance (MP1/MP2/MP3)

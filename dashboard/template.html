@@ -152,6 +152,9 @@
   .pbar .f { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--ink-3); }
   .pbar .f.hi { background: var(--watch); }
   .pbar .f.ex { background: var(--alarm); }
+  .pbar .f.two { background: var(--accent); opacity: .55; }
+  tr.grp td { background: var(--panel-2); font-family: var(--mono); font-size: .7rem; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-2); font-weight: 600; padding-top: 10px; padding-bottom: 6px; }
   .plab { font-family: var(--mono); font-size: .74rem; margin-top: 4px; color: var(--ink-2); }
   .plab .x { color: var(--alarm); font-weight: 600; }
   .plab .h { color: var(--watch); font-weight: 600; }
@@ -165,6 +168,46 @@
   td.chg, td.num { white-space: nowrap; }
   .pulse-sum { font-size: .86rem; color: var(--ink-2); margin: 0 0 10px; }
   .pulse-sum b { color: var(--ink); }
+  /* ---- plain-English layer ---- */
+  .xbtn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 6px;
+    border-radius: 50%; border: 1px solid var(--line); background: var(--panel-2); color: var(--accent);
+    font: 600 11px/1 var(--serif); font-style: italic; cursor: pointer; vertical-align: middle; padding: 0;
+    text-transform: none; letter-spacing: 0; flex: none; }
+  .xbtn:hover, .xbtn[aria-expanded="true"] { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  .xbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .xpop { position: fixed; z-index: 40; width: min(380px, calc(100vw - 16px)); max-height: min(70vh, 520px); overflow: auto;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 14px 16px 12px; font-size: .88rem; line-height: 1.5; }
+  .xpop.sheet { left: 0 !important; right: 0; bottom: 0; top: auto !important; width: 100%; max-height: 72vh;
+    border-radius: 14px 14px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .xpop .xt { font-family: var(--serif); font-size: 1.08rem; font-weight: 600; margin: 0 26px 8px 0; }
+  .xpop .xs { margin-top: 8px; }
+  .xpop .xs b { font-family: var(--mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .xpop .xs p { margin: 3px 0 0; }
+  .xpop .xq { border-top: 1px dashed var(--line); padding-top: 8px; color: var(--ink-2); font-size: .82rem; }
+  .xpop .xq b { color: var(--ink-3); }
+  .xpop .xsrc p { font-size: .78rem; color: var(--ink-3); font-style: italic; }
+  .xpop .xsrc b { color: var(--ink-3); }
+  .xclose { position: absolute; top: 8px; right: 10px; border: 0; background: none; color: var(--ink-3); font-size: 1.3rem; cursor: pointer; line-height: 1; }
+  .plain { border-left: 3px solid var(--accent); }
+  .plain .lead { font-family: var(--serif); font-size: 1.18rem; margin: 0 0 12px; }
+  .pe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; }
+  @media (max-width: 760px){ .pe-grid { grid-template-columns: 1fr; } }
+  .plain h3, .scenarios h3 { font-family: var(--mono); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 6px; }
+  .plain p, .plain li, .scn-b p, .scn-b li { font-size: .9rem; color: var(--ink); margin: 0 0 6px; }
+  .plain ul, .scn-b ul { margin: 0 0 8px; padding-left: 18px; }
+  .plain .muted { color: var(--ink-2); font-size: .84rem; }
+  .plain a { color: var(--accent); }
+  .pe-port { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+  .disclaim { font-size: .8rem !important; color: var(--ink-2) !important; background: var(--panel-2); border: 1px solid var(--line-2);
+    border-radius: 6px; padding: 8px 10px; margin-top: 8px !important; }
+  .scn-tag, .scn-now, .scn-also { display: inline-block; font-family: var(--mono); font-size: .72rem; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .scn-tag, .scn-now { background: var(--accent-soft); color: var(--accent); }
+  .scn-also { background: var(--watch-soft); color: var(--watch); }
+  details.scn { border: 1px solid var(--line-2); border-radius: 8px; margin-bottom: 8px; background: var(--panel-2); }
+  details.scn > summary { cursor: pointer; padding: 10px 12px; font-weight: 600; list-style-position: inside; }
+  details.scn[open] > summary { border-bottom: 1px solid var(--line-2); }
+  .scn-b { padding: 10px 14px 4px; }
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 </head>
@@ -185,26 +228,32 @@
     </div>
   </header>
 
+  <!-- PLAIN-ENGLISH READ -->
+  <div class="panel plain mb">
+    <div class="panel-h"><h2 data-x="plain">Plain-English read</h2><span class="hint">rewritten from the latest data on every update · tap <span class="xbtn" aria-hidden="true" style="pointer-events:none">i</span> anywhere for an explanation</span></div>
+    <div class="panel-b" id="plainBody"></div>
+  </div>
+
   <!-- SUMMARY BAND -->
   <div class="summary grid mb">
     <div class="panel tile">
-      <div class="k">Composite structural risk</div>
+      <div class="k" data-x="composite">Composite structural risk</div>
       <div class="v" id="tRisk">—</div>
-      <div style="margin-top:8px"><span class="pill" id="tRegime">—</span></div>
+      <div style="margin-top:8px" data-x="regime"><span class="pill" id="tRegime">—</span></div>
       <div class="cap" id="tRiskCap"></div>
     </div>
     <div class="panel tile">
-      <div class="k">Recession lead (8Q)</div>
+      <div class="k" data-x="auc">Recession lead (8Q)</div>
       <div class="v sm mono" id="tAuc">—</div>
       <div class="cap" id="tAucCap"></div>
     </div>
     <div class="panel tile">
-      <div class="k">Short-horizon stress</div>
+      <div class="k" data-x="short_stress">Short-horizon stress</div>
       <div class="v sm mono" id="tShort">—</div>
       <div class="cap" id="tShortCap"></div>
     </div>
     <div class="panel tile">
-      <div class="k">Credit-to-GDP gap, US</div>
+      <div class="k" data-x="us_gap">Credit-to-GDP gap, US</div>
       <div class="v sm mono" id="tGap">—</div>
       <div style="margin-top:8px"><span class="pill" id="tGapPill">—</span></div>
       <div class="cap" id="tGapCap"></div>
@@ -213,12 +262,12 @@
 
   <!-- DAILY MARKET PULSE -->
   <div class="panel mb">
-    <div class="panel-h"><h2>Daily market pulse</h2><span class="hint" id="pulseHint">FRED closes · refreshed each business day · not blended into the composite</span></div>
+    <div class="panel-h"><h2 data-x="pulse">Daily market pulse</h2><span class="hint" id="pulseHint">FRED closes · refreshed each business day · not blended into the composite</span></div>
     <div class="panel-b">
       <p class="pulse-sum" id="pulseSum"></p>
       <div style="overflow-x:auto">
       <table id="pulseTable">
-        <thead><tr><th>Series</th><th class="num">Close</th><th class="num">1D</th><th class="num">1W</th><th class="num">1M</th><th>Percentile (10y)</th><th>90 days</th><th class="num">As of</th></tr></thead>
+        <thead><tr><th>Series</th><th class="num">Close</th><th class="num">1D</th><th class="num">1W</th><th class="num">1M</th><th data-x="percentile">Percentile (10y)</th><th>90 days</th><th class="num">As of</th></tr></thead>
         <tbody></tbody>
       </table>
       </div>
@@ -228,7 +277,7 @@
 
   <!-- HISTORY -->
   <div class="panel mb">
-    <div class="panel-h"><h2>Composite risk history</h2><span class="hint">research-weighted, 0–100 · shaded = NBER recession</span></div>
+    <div class="panel-h"><h2 data-x="history">Composite risk history</h2><span class="hint">research-weighted, 0–100 · shaded = NBER recession</span></div>
     <div class="panel-b chartbox">
       <svg id="histChart" viewBox="0 0 1000 240" role="img" aria-label="Composite risk score over the full sample with NBER recessions shaded"></svg>
       <p class="note-inline" id="provNote"></p>
@@ -238,7 +287,7 @@
   <!-- FLAG DECOMPOSITION -->
   <div class="panel mb">
     <div class="panel-h">
-      <h2 id="flagTitle">Composite decomposition</h2>
+      <h2 id="flagTitle" data-x="decomposition">Composite decomposition</h2>
       <span class="hint">flag value ∈ [0,100], regime-conditional research weights (renormalized over present flags)</span>
     </div>
     <div class="panel-b">
@@ -256,14 +305,14 @@
   <!-- RECESSION BACKTEST -->
   <div class="grid g2 mb">
     <div class="panel">
-      <div class="panel-h"><h2>Recession-lead backtest</h2><span class="hint">USREC onsets · not model labels</span></div>
+      <div class="panel-h"><h2 data-x="backtest">Recession-lead backtest</h2><span class="hint">USREC onsets · not model labels</span></div>
       <div class="panel-b">
         <div class="auc-row" id="aucRow"></div>
         <p class="notes" style="margin:0" id="aucNote"></p>
       </div>
     </div>
     <div class="panel">
-      <div class="panel-h"><h2>Lead profile: risk before onset</h2><span class="hint">mean composite, quarters −8 → 0</span></div>
+      <div class="panel-h"><h2 data-x="lead">Lead profile: risk before onset</h2><span class="hint">mean composite, quarters −8 → 0</span></div>
       <div class="panel-b chartbox">
         <svg id="leadChart" viewBox="0 0 460 220" role="img" aria-label="Composite risk in the quarters before recession onsets, credit/policy-driven vs exogenous"></svg>
         <div class="legend" id="leadLegend"></div>
@@ -273,7 +322,7 @@
 
   <!-- BACKTEST ROBUSTNESS -->
   <div class="panel mb">
-    <div class="panel-h"><h2>Backtest robustness</h2><span class="hint">descriptive only · never used to re-weight</span></div>
+    <div class="panel-h"><h2 data-x="robustness">Backtest robustness</h2><span class="hint">descriptive only · never used to re-weight</span></div>
     <div class="panel-b">
       <p class="lede-eco">Does the AUC survive when the flag set is held constant, and outside the 1970s rate regime? Which flags carry it? <b>Δ</b> is composite AUC minus AUC with that flag removed (same quarters): positive = the flag helps. With ~8 recessions, |Δ| below ~0.03 is noise, and re-weighting from this table would be fitting to the sample.</p>
       <p class="pulse-sum" id="robCallout"></p>
@@ -284,26 +333,32 @@
     </div>
   </div>
 
-  <!-- FISCAL & VALUATION CONTEXT -->
+  <!-- DALIO CONTEXT PANEL -->
   <div class="panel mb">
-    <div class="panel-h"><h2>Fiscal &amp; valuation context</h2><span class="hint">percentile vs own history · expanding window, no look-ahead</span></div>
+    <div class="panel-h"><h2 data-x="context">Dalio context: debt, bubbles, policy room</h2><span class="hint">percentile vs own history · expanding window, no look-ahead</span></div>
     <div class="panel-b">
       <div class="ctx-banner"><span class="tag">NOT SCORED</span>
-        <div>The composite cannot see this leg: the BIS credit gap covers the <b>private</b> sector only, and the recession backtest cannot validate sovereign metrics. In the metric-gap audit, federal debt/GDP and the deficit scored AUC ≈ 0.3 because deficits widen <i>after</i> recessions. They are shown here as context, with <b>no panel composite</b>, since any weight would be a guess.</div>
+        <div>The rest of Dalio's checklist, which the composite cannot carry. The BIS credit gap covers the <b>private</b> sector only, and the recession backtest cannot validate sovereign, valuation or policy-capacity metrics: in the metric-gap audit none improved the score, and federal debt/GDP and the deficit scored <b>below</b> chance (they rise <i>after</i> recessions). So each is shown on its own, with <b>no panel composite</b>, since any weight would be a guess.</div>
       </div>
       <div style="overflow-x:auto">
       <table id="fiscalTable">
-        <thead><tr><th>Metric</th><th class="num">Latest</th><th>Percentile vs history</th><th>Last 10 years</th><th class="num">As of</th></tr></thead>
+        <thead><tr><th>Metric</th><th class="num">Latest</th><th data-x="percentile">How stretched vs history</th><th>Last 10 years</th><th class="num">As of</th></tr></thead>
         <tbody></tbody>
       </table>
       </div>
-      <p class="note-inline">Percentiles here are against the <b>full</b> history on purpose: the question is "is this a record?". Several of these series trend, so a high percentile means <i>historically unusual</i>, not a calibrated danger level (which is why none of them is scored). Metric set chosen from theory (Dalio, <i>How Countries Go Broke</i>), not by which series read extreme today. Valuation ratios are index-based, so only the percentile is shown.</p>
+      <p class="note-inline">Bars show how stretched each reading is against its <b>full</b> history, oriented so a longer bar is always the riskier direction: a <i>low</i> fed funds rate means little room to cut, a <i>falling</i> foreign share means weaker outside demand for Treasuries. Blue bars are two-sided: both extremes matter, so they're labeled unusual rather than stretched. Several series trend, so a high reading means <i>historically unusual</i>, not a calibrated danger level. Rows marked “12-month change” come from Treasury’s foreign-holder report, which only publishes the latest 13 months. Metrics are included because Dalio's framework names them (<i>Big Debt Crises</i>, <i>How Countries Go Broke</i>), not because they read extreme today. Ratios built from dollar levels show a percentile only.</p>
     </div>
+  </div>
+
+  <!-- SCENARIO GUIDE -->
+  <div class="panel scenarios mb" id="scenarioGuide">
+    <div class="panel-h"><h2 data-x="scenarios">Scenario guide</h2><span class="hint">Dalio’s seven situations · current one picked from live data</span></div>
+    <div class="panel-b" id="scenarioBody"></div>
   </div>
 
   <!-- CROSS-COUNTRY GAP -->
   <div class="panel mb">
-    <div class="panel-h"><h2>Cross-country credit-to-GDP gap</h2><span class="hint" id="gapHint">BIS ratios · one-sided HP λ=400k</span></div>
+    <div class="panel-h"><h2 data-x="gaps">Cross-country credit-to-GDP gap</h2><span class="hint" id="gapHint">BIS ratios · one-sided HP λ=400k</span></div>
     <div class="panel-b">
       <p class="lede-eco">The gap is the one non-redundant cross-country signal: term spreads and HY OAS co-move globally (already in the US composite), whereas credit cycles are national. Read the <b>relative ordering</b> more than the absolute levels: a one-sided HP trend anchored on the pre-2008 peak biases post-crisis gaps negative across the board.</p>
       <div class="chartbox"><svg id="gapChart" viewBox="0 0 700 250" role="img" aria-label="Credit-to-GDP gap trajectory by economy"></svg></div>
@@ -320,7 +375,7 @@
   <!-- METHOD & CAVEATS -->
   <div class="grid g2">
     <div class="panel">
-      <div class="panel-h"><h2>Method notes</h2></div>
+      <div class="panel-h"><h2 data-x="method">Method notes</h2></div>
       <div class="panel-b"><ul class="notes" style="padding-left:18px; margin:0">
         <li><b>No look-ahead.</b> Percentiles rank each value against prior observations only (mid-rank ties); the HP trend is one-sided (<code>λ=400,000</code>, 40q burn-in). Quarterly macro inputs are re-timed to their <b>publication</b> quarter (<span id="lagTxt">credit gap +2q, DSR +2q, M2 velocity +1q</span>), and backtest quarters whose outcome window is not yet observed are excluded.</li>
         <li><b>Stationary inputs.</b> Trending series are transformed before ranking: M2 velocity enters as its year-on-year change; the long-bond yield is ranked within a trailing 10-year window. Curve: <span id="curveTxt">10y−3m</span>.</li>
@@ -331,7 +386,7 @@
       </ul></div>
     </div>
     <div class="panel">
-      <div class="panel-h"><h2>Known limitations</h2></div>
+      <div class="panel-h"><h2 data-x="limits">Known limitations</h2></div>
       <div class="panel-b"><ul class="notes" style="padding-left:18px; margin:0">
         <li><b>Latest-vintage data.</b> Current-vintage FRED, not ALFRED point-in-time: publication <i>timing</i> is corrected, but later data <i>revisions</i> still leak into the backtest.</li>
         <li><b>HP-filter critique.</b> The one-sided HP gap is the Basel/BIS standard, but Hamilton (2018) shows it can generate spurious cycle dynamics; read gap magnitudes with that in mind.</li>
@@ -423,7 +478,7 @@ const DATA = /*__DASHBOARD_DATA__*/null;
   const tb = document.querySelector("#flagTable tbody");
   DATA.flags.forEach(f=>{
     const tr=document.createElement("tr");
-    tr.innerHTML = '<td>'+f.name+'</td><td class="num">'+f.v+'</td>'+
+    tr.innerHTML = '<td data-x="'+f.key+'">'+f.name+'</td><td class="num">'+f.v+'</td>'+
       '<td class="barcell"><div class="bg"></div><div class="fg" style="width:'+(f.contrib/maxC*86).toFixed(1)+'%;background:var('+stCol[f.st]+')"></div></td>'+
       '<td class="num wt">'+f.wt.toFixed(2)+'</td><td><span class="pill '+stPill[f.st]+'">'+f.st+'</span></td>';
     tr.title = "contribution " + f.contrib + " pts";
@@ -453,7 +508,7 @@ const DATA = /*__DASHBOARD_DATA__*/null;
   (DATA.attribution||[]).slice().sort((a,b)=>(b.delta??-9)-(a.delta??-9)).forEach(a=>{ const tr=document.createElement("tr");
     const d=a.delta, cls = d==null ? "chg-n" : (d>=0.03 ? "chg-g" : (d<=-0.03 ? "chg-r" : "chg-n"));
     const lab = d==null ? "" : (d>=0.03 ? " helps" : (d<=-0.03 ? " dilutes" : " noise"));
-    tr.innerHTML='<td>'+a.name+'</td><td class="num">'+f2(a.standalone_auc)+'</td><td class="num">'+f2(a.drop_one_auc)+'</td>'+
+    tr.innerHTML='<td data-x="'+a.key+'">'+a.name+'</td><td class="num">'+f2(a.standalone_auc)+'</td><td class="num">'+f2(a.drop_one_auc)+'</td>'+
       '<td class="num '+cls+'">'+(d==null?"—":(d>0?"+":"")+d.toFixed(3))+'<span class="wt">'+lab+'</span></td>';
     document.querySelector("#attTable tbody").appendChild(tr); });
 
@@ -497,7 +552,7 @@ const DATA = /*__DASHBOARD_DATA__*/null;
       const tr=document.createElement("tr");
       const close = p.sid==="SP500" ? p.latest.toFixed(1)+'% <span class="wt">('+(p.level_close!=null?p.level_close.toLocaleString():"—")+')</span>'
                                     : p.latest.toFixed(2)+(p.unit?' <span class="wt">'+p.unit+'</span>':'');
-      tr.innerHTML = '<td>'+p.name+'</td><td class="num">'+close+'</td>'+cell(p,p.chg_1d)+cell(p,p.chg_1w)+cell(p,p.chg_1m)+
+      tr.innerHTML = '<td data-x="'+p.sid+'">'+p.name+'</td><td class="num">'+close+'</td>'+cell(p,p.chg_1d)+cell(p,p.chg_1w)+cell(p,p.chg_1m)+
         '<td><div class="pbar"><div class="f" style="width:'+p.pct_10y+'%"></div></div><div class="plab">'+p.pct_10y+'th pct'+(p.pct_years!=null && p.pct_years<9.5 ? ' <span class="wt">('+p.pct_years.toFixed(0)+'y only)</span>' : '')+'</div></td>'+
         '<td><svg class="spark" id="pspark'+pi+'" viewBox="0 0 120 30" role="img" aria-label="'+p.name+', last 90 business days"></svg></td>'+
         '<td class="num wt">'+p.as_of+'</td>';
@@ -507,20 +562,44 @@ const DATA = /*__DASHBOARD_DATA__*/null;
     document.querySelector("#pulseTable tbody").innerHTML = '<tr><td colspan="8" class="wt">Daily market series unavailable this run.</td></tr>';
   }
 
-  // ---------- fiscal table ----------
+  // ---------- Dalio context table (grouped, risk-oriented) ----------
   const ft = document.querySelector("#fiscalTable tbody");
+  let lastGroup = null;
   DATA.fiscal.forEach((m,mi)=>{
-    const p = m.percentile, cls = p>=90 ? "ex" : (p>=75 ? "hi" : "");
-    const lab = p>=90 ? '<span class="x">extreme</span>' : (p>=75 ? '<span class="h">high</span>' : 'normal range');
+    if (m.group && m.group !== lastGroup) {
+      const g=document.createElement("tr"); g.className="grp";
+      g.innerHTML='<td colspan="5">'+m.group+'</td>'; ft.appendChild(g); lastGroup=m.group;
+    }
+    if (m.percentile==null) {   // short published history: 12-month change, no ranking
+      const tr=document.createElement("tr");
+      const cls = m.toward_risk===true ? "chg-r" : (m.toward_risk===false ? "chg-g" : "chg-n");
+      const arr = m.latest>0 ? "▲" : (m.latest<0 ? "▼" : "·");
+      tr.innerHTML = '<td><div class="fname" data-x="'+m.key+'">'+m.name+'</div><div class="fwhy">'+m.why+'</div></td>'+
+        '<td class="num chg '+cls+'">'+(m.unit && m.latest!=null ? arr+' '+(m.latest>0?'+':'')+m.latest.toFixed(1)+' <span class="wt">'+m.unit+'</span>' : '<span class="wt">n/a</span>')+'</td>'+
+        '<td><div class="plab">12-month change · '+(m.toward_risk===true ? '<span class="x">toward risk</span>' : m.toward_risk===false ? 'away from risk' : 'flat')+
+          '<br><span class="wt">only 13 months published, so no history to rank against</span></div></td>'+
+        '<td><svg class="spark" id="spark'+mi+'" viewBox="0 0 120 30" role="img" aria-label="'+m.name+' last 13 months"></svg></td>'+
+        '<td class="num wt">'+m.as_of+'</td>';
+      ft.appendChild(tr);
+      return;
+    }
+    const two = m.risk_percentile==null;
+    const rp = two ? null : m.risk_percentile;
+    const cls = two ? "two" : (rp>=90 ? "ex" : (rp>=75 ? "hi" : ""));
+    const lab = two
+      ? (Math.abs(m.percentile-50)>=40 ? '<span class="h">unusual</span>' : 'two-sided')
+      : (rp>=90 ? '<span class="x">extreme</span>' : (rp>=75 ? '<span class="h">stretched</span>' : 'normal range'));
+    const width = two ? m.percentile : rp;
+    const pctTxt = two ? m.percentile+'th pct' : (m.risk_dir<0 ? m.percentile+'th pct (low = risk)' : m.percentile+'th pct');
     const tr=document.createElement("tr");
-    tr.innerHTML = '<td><div class="fname">'+m.name+'</div><div class="fwhy">'+m.why+'</div></td>'+
-      '<td class="num">'+(m.unit ? m.latest.toFixed(1)+' <span class="wt">'+m.unit+'</span>' : '<span class="wt">index</span>')+'</td>'+
-      '<td><div class="pbar"><div class="f '+cls+'" style="width:'+p+'%"></div></div><div class="plab">'+p+'th pct · '+lab+'</div></td>'+
+    tr.innerHTML = '<td><div class="fname" data-x="'+m.key+'">'+m.name+'</div><div class="fwhy">'+m.why+'</div></td>'+
+      '<td class="num">'+(m.unit && m.latest!=null ? m.latest.toFixed(1)+' <span class="wt">'+m.unit+'</span>' : '<span class="wt">pct only</span>')+'</td>'+
+      '<td><div class="pbar"><div class="f '+cls+'" style="width:'+width+'%"></div></div><div class="plab">'+pctTxt+' · '+lab+'</div></td>'+
       '<td><svg class="spark" id="spark'+mi+'" viewBox="0 0 120 30" role="img" aria-label="'+m.name+' last 10 years"></svg></td>'+
       '<td class="num wt">'+m.as_of+'</td>';
     ft.appendChild(tr);
   });
-  if (!DATA.fiscal.length) ft.innerHTML = '<tr><td colspan="5" class="wt">Fiscal series unavailable this run.</td></tr>';
+  if (!DATA.fiscal.length) ft.innerHTML = '<tr><td colspan="5" class="wt">Context series unavailable this run.</td></tr>';
 
   // ---------- gap table + legend ----------
   if (DATA.gaps) {
@@ -531,7 +610,7 @@ const DATA = /*__DASHBOARD_DATA__*/null;
       d.innerHTML='<span class="sw" style="background:var('+mt.col+')"></span>'+mt.c; gl.appendChild(d);
       const st = mt.state==="max-warning" ? "alarm" : (mt.state==="watch" ? "watch" : "good");
       const tr=document.createElement("tr");
-      tr.innerHTML='<td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var('+mt.col+');margin-right:7px;vertical-align:middle"></span>'+mt.c+'</td>'+
+      tr.innerHTML='<td data-x="gap_row"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var('+mt.col+');margin-right:7px;vertical-align:middle"></span>'+mt.c+'</td>'+
         '<td class="num">'+fmtNeg(mt.gap)+'</td><td><span class="pill '+stPill[st]+'">'+mt.state.replace("-"," ")+'</span></td>'+
         '<td class="num">'+mt.nq+'</td><td class="mono" style="font-size:.8rem;color:var(--ink-2)">'+mt.conf+'</td>'+
         '<td class="num">'+fmtNeg(mt.d2y)+'</td><td class="num wt">'+mt.q+'</td>';
@@ -629,10 +708,13 @@ const DATA = /*__DASHBOARD_DATA__*/null;
       const a=m.history, n=a.length; if(n<2) return;
       const lo=Math.min(...a), hi=Math.max(...a), rng=(hi-lo)||1;
       const xs=i=>2+i/(n-1)*112, ys=v=>26-(v-lo)/rng*22;
-      const col = m.percentile>=90 ? css('--alarm') : (m.percentile>=75 ? css('--watch') : css('--ink-3'));
+      const rp = m.risk_percentile;
+      const col = m.percentile==null ? (m.toward_risk ? css('--alarm') : css('--ink-3'))
+        : rp==null ? css('--accent') : (rp>=90 ? css('--alarm') : (rp>=75 ? css('--watch') : css('--ink-3')));
       svg.innerHTML='<path d="'+linePath(a,xs,ys)+'" fill="none" stroke="'+col+'" stroke-width="1.6" stroke-linejoin="round"/>'+
         '<circle cx="'+xs(n-1)+'" cy="'+ys(a[n-1])+'" r="2.6" fill="'+col+'"/>';
-      svg.onmousemove=e=>showTT(e,'<b>'+m.name+'</b><br>'+m.history_q[0]+' → '+m.history_q[n-1]+'<br>range '+lo.toFixed(1)+' to '+hi.toFixed(1));
+      const f = v => m.unit ? v.toFixed(1) : (Math.abs(v)<1 ? v.toPrecision(2) : v.toFixed(1));
+      svg.onmousemove=e=>showTT(e,'<b>'+m.name+'</b><br>'+m.history_q[0]+' → '+m.history_q[n-1]+(m.unit ? '<br>range '+f(lo)+' to '+f(hi)+' '+m.unit : '<br>shape only (units not shown)'));
       svg.onmouseleave=hideTT;
     });
   }
@@ -670,6 +752,10 @@ const DATA = /*__DASHBOARD_DATA__*/null;
     document.addEventListener("visibilitychange", () => { if (document.visibilityState==="visible") check(); });
   }
 })();
+</script>
+<script>
+/*__EXPLAIN_JS__*/
+/*__GUIDE_JS__*/
 </script>
 </body>
 </html>

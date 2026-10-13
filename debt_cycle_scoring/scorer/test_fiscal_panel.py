@@ -64,6 +64,41 @@ def test_index_ratios_hide_raw_value():
     assert m["net_worth"].unit == "" and np.isnan(m["net_worth"].latest)
 
 
+def test_every_metric_is_in_a_dalio_group_and_oriented():
+    from debt_cycle_scoring.scorer.fiscal_panel import _SPECS, GROUPS
+    assert len(_SPECS) >= 15
+    for sp in _SPECS:
+        assert sp.group in GROUPS and sp.risk_dir in (-1, 0, 1)
+
+
+def test_dollar_level_is_divided_by_gdp_but_a_ratio_is_not():
+    from debt_cycle_scoring.scorer.fiscal_panel import _per_gdp
+    d = pd.date_range("1970-01-01", periods=200, freq="QS")
+    gdp = pd.Series(np.linspace(1000, 30000, 200), index=d)          # $bn
+    level = gdp * 1000 * 0.5                                          # $mn, constant 50% of GDP
+    ratio = pd.Series(np.full(200, 45.0), index=d)                    # already % of GDP
+    r1 = _per_gdp({"X": level, "GDP": gdp}, "X")
+    r2 = _per_gdp({"Y": ratio, "GDP": gdp}, "Y")
+    assert r1.std() < 1e-9            # level / GDP -> flat ratio, the trend is removed
+    assert (r2 == 45.0).all()         # ratio left untouched
+
+
+def test_low_is_risk_metrics_are_flipped():
+    d = pd.date_range("1960-01-01", periods=240, freq="MS")
+    raw = {"FEDFUNDS": pd.Series(np.r_[np.linspace(8, 1, 200), np.full(40, 0.1)], index=d)}
+    m = {x.key: x for x in build_fiscal_panel(raw, _panel())}
+    ff = m["fed_funds"]
+    assert ff.percentile <= 10 and ff.risk_percentile >= 90  # rate at its low = little room to cut (ties: mid-rank)
+
+
+def test_implausible_units_hide_the_raw_value():
+    d = pd.date_range("1970-01-01", periods=200, freq="QS")
+    raw = {"FDHBFIN": pd.Series(np.full(200, 7000.0), index=d),      # $bn
+           "GFDEBTN": pd.Series(np.full(200, 30000.0), index=d)}     # wrong scale on purpose
+    m = {x.key: x for x in build_fiscal_panel(raw, _panel())}
+    assert m["foreign_share"].unit == "" and np.isnan(m["foreign_share"].latest)
+
+
 def test_exporter_render_injects_json_safely():
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -76,6 +111,9 @@ def test_exporter_render_injects_json_safely():
     html = out.read_text(encoding="utf-8")
     assert E.PLACEHOLDER not in html
     assert "</script><b>x" not in html               # can't break out of the script tag
+    # plain-English layer is inlined, not left as placeholders
+    assert "__EXPLAIN_JS__" not in html and "__GUIDE_JS__" not in html
+    assert "const EXPLAIN" in html and "SCENARIOS" in html
     json.loads((out.parent / "data.json").read_text())
 
 

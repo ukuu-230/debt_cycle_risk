@@ -36,7 +36,7 @@ FRED_CATALOG = [
         higher_is_later_cycle=True,
     ),
     MetricSpec(
-        "Nonfinancial corporate debt/GDP", "NCBDBIQ027S", "debt_burden", "Q", "last",
+        "Nonfinancial corporate debt (level)", "NCBDBIQ027S", "debt_burden", "Q", "last",
         higher_is_later_cycle=True,
     ),
     MetricSpec(

@@ -211,6 +211,14 @@ def build_data(client) -> Dict:
             raw[sid] = client.fetch_series(sid, start_date="1960-01-01").series
         except Exception as exc:
             log(f"  WARNING: {sid} unavailable -- skipped ({type(exc).__name__})")
+    # free US Treasury sources FRED doesn't carry (avg rate on existing debt,
+    # debt by type, TIC foreign holders); each is skipped cleanly if unavailable
+    try:
+        from debt_cycle_scoring.ingestion.treasury_client import TreasuryClient, fetch_treasury_extras
+        log("Fetching US Treasury data (Fiscal Data API, TIC) ...")
+        raw.update(fetch_treasury_extras(TreasuryClient(), log))
+    except Exception as exc:
+        log(f"  WARNING: Treasury sources skipped ({type(exc).__name__}: {exc})")
     fiscal = [m.__dict__ for m in build_fiscal_panel(raw, panel)]
 
     # --- 7. daily market pulse (always re-downloaded: never a cached close) --
@@ -255,8 +263,15 @@ def render(data: Dict, out_dir: Path) -> Path:
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "data.json").write_text(json.dumps(data, indent=1), encoding="utf-8")
+    html = html.replace(PLACEHOLDER, blob)
+    # plain-English layer: explanation library + scenario engine, inlined so the
+    # page stays a single self-contained file
+    for marker, fname in (("/*__EXPLAIN_JS__*/", "explain.js"), ("/*__GUIDE_JS__*/", "guide.js")):
+        src = TEMPLATE.parent / fname
+        if marker in html and src.exists():
+            html = html.replace(marker, src.read_text(encoding="utf-8").replace("</script", "<\\/script"))
     out = out_dir / "index.html"
-    out.write_text(html.replace(PLACEHOLDER, blob), encoding="utf-8")
+    out.write_text(html, encoding="utf-8")
     return out
 
 
